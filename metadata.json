@@ -1,0 +1,6 @@
+{
+  "name": "PAIMANA InfraPredict",
+  "description": "AI-Powered Infrastructure Project Predictive Monitoring & Early Warning Platform for cost overruns, delay risks, ML benchmarking, scenario simulation, and prescriptive interventions.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
