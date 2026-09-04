@@ -68,15 +68,26 @@ export interface InfrastructureProject {
   costOverrunAmount: number; // in ₹ Crores
   physicalProgress: number; // 0 to 100%
   financialProgress: number; // 0 to 100%
+  expenditureRatio: number; // 0 to 100% (Derived feature for ML)
+  progressExpenditureDivergence: number; // (Derived feature for ML)
+  progressEfficiencyIndex: number; // Physical Progress / Expenditure Ratio
   plannedPhysicalProgress: number; // 0 to 100%
   status: ProjectStatus;
   
+  // Time Overrun ML Features
+  originalDurationMonths: number;
+  revisedDurationMonths: number;
+  delayPercent: number;
+  
   // AI Risk Metrics
-  costOverrunProbability: number; // 0 to 100%
-  delayProbability: number; // 0 to 100%
-  implementationRisk: number; // 0 to 100%
+  scheduleRiskScore: number; // 0 to 100
+  costRiskScore: number; // 0 to 100
+  progressRiskScore: number; // 0 to 100
+  expenditureProgressRiskScore: number; // 0 to 100
   overallRiskScore: number; // 0 to 100
   riskLevel: RiskLevel;
+  costOverrunProbability: number;
+  delayProbability: number;
   
   // Predict & Explain Attributes
   majorCostEscalationDrivers: string[];

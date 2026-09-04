@@ -199,7 +199,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
                     <Activity className="w-4 h-4 text-indigo-500" />
                   </div>
                   <div className="text-3xl font-bold font-mono text-indigo-700 mt-2">
-                    {project.implementationRisk}%
+                    {project.progressRiskScore}%
                   </div>
                   <p className="text-[11px] text-slate-500 mt-1">
                     Contractor: {project.contractorRiskRating}

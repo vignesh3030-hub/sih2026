@@ -22,7 +22,8 @@ import {
   Bot,
   FileBarChart,
   Activity,
-  BookOpen
+  BookOpen,
+  FileSpreadsheet
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -42,10 +43,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: BarChart2, badge: null },
-    { id: 'projects', label: 'Projects Registry', icon: Server, badge: '110' },
+    { id: 'projects', label: 'Projects', icon: Folder, badge: null },
+    { id: 'milestones', label: 'Milestones', icon: Calendar, badge: null },
+    { id: 'issues', label: 'Issues & Bottlenecks', icon: AlertTriangle, badge: null },
+    { id: 'data-quality', label: 'Data Quality', icon: Database, badge: null },
+    { id: 'users', label: 'User Management', icon: ShieldCheck, badge: null },
+    { id: 'data-import', label: 'Data Import (CSV)', icon: FileSpreadsheet, badge: 'NEW', badgeColor: 'bg-emerald-500 text-white' },
     { id: 'risk-monitor', label: 'Risk Monitor', icon: Users, badge: `${criticalCount}`, badgeColor: 'bg-rose-500 text-white' },
-    { id: 'early-warnings', label: 'Early Warnings', icon: Package, badge: `${criticalCount + highRiskCount}`, badgeColor: 'bg-amber-400 text-slate-950 font-bold' },
+    { id: 'early-warnings', label: 'AI Early Warning & Risk Intelligence', icon: Package, badge: `${criticalCount + highRiskCount}`, badgeColor: 'bg-amber-400 text-slate-950 font-bold' },
     { id: 'predictive', label: 'Predictive Analytics', icon: Gauge, badge: 'ML' },
+    { id: 'drivers', label: 'Driver Analysis', icon: TrendingUp, badge: 'CUF' },
     { id: 'benchmarking', label: 'Benchmarking', icon: Database, badge: null },
     { id: 'scenario', label: 'Scenario What-If', icon: Folder, badge: 'Sim' },
     { id: 'interventions', label: 'Interventions (PMG)', icon: Shield, badge: null },

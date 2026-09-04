@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { InfrastructureProject } from '../../types';
 import { 
   Search, 
   Sun, 
@@ -16,29 +17,74 @@ interface HeaderProps {
   activeView: string;
   onNavigate: (view: string) => void;
   onOpenSearch: () => void;
-  onToggleDemoGuide: () => void;
-  demoGuideOpen: boolean;
-  demoStep: number;
   criticalCount: number;
   warningCount: number;
   searchQuery?: string;
   onSearchChange?: (query: string) => void;
+  currentUser?: { name: string; role: string; department: string };
+  onLogout: () => void;
+  projects?: InfrastructureProject[];
+  onSelectProject?: (project: InfrastructureProject) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   activeView,
   onNavigate,
   onOpenSearch,
-  onToggleDemoGuide,
-  demoGuideOpen,
-  demoStep,
   criticalCount,
   warningCount,
   searchQuery = '',
-  onSearchChange
+  onSearchChange,
+  currentUser = { name: 'Varshini', role: 'Admin', department: 'Data Informatics & Innovation Division' },
+  onLogout,
+  projects = [],
+  onSelectProject
 }) => {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [localSearchQuery, setLocalSearchQuery] = useState('');
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setShowSearchResults(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const searchResults = useMemo(() => {
+    if (!localSearchQuery.trim() || !projects.length) return [];
+    const query = localSearchQuery.toLowerCase().trim();
+    const terms = query.split(/\s+/);
+    return projects.map(p => {
+      let score = 0;
+      const name = p.name.toLowerCase();
+      const code = p.projectCode.toLowerCase();
+      const agency = p.implementingAgency.toLowerCase();
+      const state = p.state.toLowerCase();
+      
+      if (code === query) score += 100;
+      if (name === query) score += 50;
+      if (code.startsWith(query)) score += 30;
+      if (name.startsWith(query)) score += 20;
+
+      terms.forEach(term => {
+        if (code.includes(term)) score += 15;
+        if (name.includes(term)) score += 10;
+        if (agency.includes(term)) score += 5;
+        if (state.includes(term)) score += 3;
+      });
+      return { project: p, score };
+    })
+    .filter(r => r.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5)
+    .map(r => r.project);
+  }, [localSearchQuery, projects]);
 
   return (
     <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-2xs">
@@ -62,7 +108,7 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Center Search Pill matching screenshot */}
-        <div className="flex-1 max-w-md mx-4 hidden md:block">
+        <div className="flex-1 max-w-md mx-4 hidden md:block" ref={searchRef}>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
               <Search className="w-4 h-4" />
@@ -70,34 +116,44 @@ export const Header: React.FC<HeaderProps> = ({
             <input
               type="text"
               placeholder="Search projects, corridors, ministries, EPC contractors..."
-              value={searchQuery}
-              onChange={(e) => onSearchChange && onSearchChange(e.target.value)}
-              onClick={onOpenSearch}
+              value={localSearchQuery}
+              onChange={(e) => {
+                setLocalSearchQuery(e.target.value);
+                setShowSearchResults(true);
+              }}
+              onFocus={() => setShowSearchResults(true)}
               className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 hover:border-slate-300 focus:border-purple-600 focus:bg-white focus:ring-2 focus:ring-purple-100 rounded-full text-xs text-slate-800 placeholder-slate-400 transition-all outline-hidden shadow-2xs"
             />
+            {showSearchResults && localSearchQuery.trim().length > 0 && (
+              <div className="absolute top-full mt-2 w-full bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-50 max-h-[400px] overflow-y-auto">
+                {searchResults.length > 0 ? (
+                  searchResults.map(p => (
+                    <div 
+                      key={p.id} 
+                      className="px-4 py-2 hover:bg-slate-50 cursor-pointer border-b border-slate-100 last:border-0"
+                      onClick={() => {
+                        onSelectProject && onSelectProject(p);
+                        setShowSearchResults(false);
+                        setLocalSearchQuery('');
+                      }}
+                    >
+                      <div className="text-xs font-bold text-slate-900 truncate">{p.name}</div>
+                      <div className="flex items-center justify-between mt-1">
+                        <span className="text-[10px] font-mono text-purple-600 font-semibold">{p.projectCode}</span>
+                        <span className="text-[10px] text-slate-500">{p.state}</span>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="px-4 py-3 text-xs text-slate-500 text-center">No projects found for "{localSearchQuery}"</div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
         {/* Right Actions & Controls */}
         <div className="flex items-center gap-3">
-          {/* Hackathon Demo Flow CTA */}
-          <button
-            id="btn-header-demo-tour"
-            onClick={onToggleDemoGuide}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
-              demoGuideOpen
-                ? 'bg-purple-700 text-white shadow-sm ring-2 ring-purple-300'
-                : 'bg-purple-50 text-purple-900 border border-purple-200 hover:bg-purple-100'
-            }`}
-            title="Interactive SIH Evaluator Walkthrough"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-            <span className="hidden sm:inline">SIH Walkthrough</span>
-            <span className="px-1.5 py-0.2 rounded-full bg-white/30 text-[10px] font-mono font-bold">
-              {demoStep}/11
-            </span>
-          </button>
-
           {/* Theme Switcher Pill matching screenshot */}
           <div className="flex items-center bg-slate-100 border border-slate-200 p-0.5 rounded-full">
             <button
@@ -171,19 +227,33 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </div>
 
-          {/* User Profile Avatar Pill matching screenshot */}
+          {/* User Profile Avatar Pill */}
           <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
             <div className="relative">
               <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-800 to-indigo-600 flex items-center justify-center text-white font-bold text-xs ring-2 ring-purple-100 shadow-2xs">
-                AK
+                {currentUser.name.substring(0, 2).toUpperCase()}
               </div>
               <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-white" />
             </div>
             <div className="hidden xl:block text-left">
-              <div className="text-xs font-bold text-slate-800 leading-tight">Arun Kumar</div>
-              <div className="text-[10px] text-slate-400">MoSPI PMG Cell</div>
+              <div className="text-xs font-bold text-slate-800 leading-tight flex items-center gap-1.5">
+                <span>{currentUser.name}</span>
+                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                  {currentUser.role}
+                </span>
+              </div>
+              <div className="text-[10px] text-slate-400 max-w-[140px] truncate">{currentUser.department}</div>
             </div>
           </div>
+
+          {/* Logout Button */}
+          <button 
+            onClick={onLogout}
+            className="ml-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold rounded-lg transition-colors"
+            title="Secure Logout"
+          >
+            Logout
+          </button>
         </div>
       </div>
     </header>

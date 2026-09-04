@@ -175,91 +175,133 @@ export const EarlyWarningsView: React.FC<EarlyWarningsViewProps> = ({
           const cardBorder = isCritical ? 'border-rose-300' : isHigh ? 'border-amber-300' : 'border-slate-200';
           const badgeBg = isCritical ? 'bg-rose-100 text-rose-800' : isHigh ? 'bg-amber-100 text-amber-800' : 'bg-yellow-100 text-yellow-800';
 
+          // Generate AI predictive text
+          const predictiveText = `This project has an ${alert.riskScore}% predicted risk of schedule delay because its physical progress (${associatedProject?.physicalProgress}%) is below expected progress (${associatedProject?.plannedPhysicalProgress}%) and its completion deadline is approaching.`;
+
           return (
             <div
               key={alert.id}
-              className={`bg-white rounded-2xl p-5 border ${cardBorder} shadow-xs transition-all hover:shadow-md space-y-4`}
+              className={`bg-white rounded-2xl border-2 ${cardBorder} shadow-lg overflow-hidden transition-all hover:shadow-xl space-y-0`}
             >
-              {/* Alert Top Meta */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+              {/* Header */}
+              <div className="bg-slate-900 px-5 py-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${badgeBg}`}>
-                    {alert.riskLevel} PRIORITY
-                  </span>
-                  <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-mono">
-                    {alert.riskType}
-                  </span>
-                  <span className="text-xs font-mono text-slate-400">
-                    Alert ID: {alert.id}
-                  </span>
+                  <AlertTriangle className="w-5 h-5 text-amber-400" />
+                  <span className="text-white font-bold tracking-widest text-sm uppercase">AI Early Warning</span>
                 </div>
-
-                <div className="flex items-center gap-3 text-xs text-slate-500 font-mono">
-                  <span className="flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5" />
-                    Date: {alert.alertDate}
-                  </span>
-                  <span>•</span>
-                  <span>AI Score: <strong className="text-slate-900">{alert.riskScore}/100</strong></span>
-                </div>
+                <span className="text-xs font-mono text-slate-400">
+                  ID: {alert.id}
+                </span>
               </div>
 
-              {/* Project & Reason Description */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <div className="lg:col-span-2 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-base font-bold text-slate-900">
+              {/* Body */}
+              <div className="p-6 space-y-6">
+                
+                {/* Project Info & Overall Risk */}
+                <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 border-b border-slate-100 pb-5">
+                  <div>
+                    <div className="text-sm text-slate-500 font-semibold mb-1">Project: <span className="font-mono text-blue-600">{associatedProject?.projectCode || alert.projectId}</span></div>
+                    <h3 className="text-xl font-bold text-slate-900 leading-tight">
                       {alert.projectName}
                     </h3>
-                    <span className="text-xs font-mono text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
-                      {associatedProject?.projectCode || alert.projectId}
-                    </span>
                   </div>
-
-                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 text-xs text-slate-800 leading-relaxed">
-                    <strong className="text-slate-900 font-semibold block mb-1">Trigger Reason & Signal:</strong>
-                    {alert.reason}
+                  <div className="flex flex-col md:items-end gap-1">
+                    <div className="text-sm font-semibold text-slate-600">Overall Risk: <span className={`font-bold ${isCritical ? 'text-rose-600' : isHigh ? 'text-amber-600' : 'text-yellow-600'}`}>{isCritical ? '🔴 CRITICAL' : isHigh ? '🟠 HIGH' : '🟡 MEDIUM'}</span></div>
+                    <div className="text-sm font-semibold text-slate-600">Risk Score: <span className="font-bold text-slate-900 font-mono text-lg">{alert.riskScore} / 100</span></div>
                   </div>
                 </div>
 
-                {/* Evidence Metric Pill */}
-                <div className="bg-slate-900 text-white p-4 rounded-xl flex flex-col justify-between">
-                  <div>
-                    <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">
-                      Key Anomaly Indicator
-                    </span>
-                    <div className="text-sm font-semibold text-slate-100 mt-1 font-mono">
-                      {alert.evidenceMetric}
+                {/* The Predictive Statement */}
+                <div className="bg-amber-50 border-l-4 border-amber-400 p-4 rounded-r-xl">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                    <p className="text-sm text-amber-900 font-medium leading-relaxed">
+                      {predictiveText}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Analytics Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {/* Left Column: Risk Scores */}
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 border-b border-slate-100 pb-2">Risk Factor Breakdown</h4>
+                    
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-slate-600 font-medium">Schedule Risk:</span>
+                        <span className="font-bold font-mono bg-slate-100 px-2 py-0.5 rounded text-slate-700">{associatedProject?.scheduleRiskScore || 0}%</span>
+                      </div>
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-slate-600 font-medium">Cost Risk:</span>
+                        <span className="font-bold font-mono bg-slate-100 px-2 py-0.5 rounded text-slate-700">{associatedProject?.costRiskScore || 0}%</span>
+                      </div>
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-slate-600 font-medium">Progress Risk:</span>
+                        <span className="font-bold font-mono bg-slate-100 px-2 py-0.5 rounded text-slate-700">{associatedProject?.progressRiskScore || 0}%</span>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 pt-4 border-t border-slate-100">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-bold text-slate-700">Expected Delay:</span>
+                        <span className="text-sm font-bold text-rose-600 font-mono bg-rose-50 px-2 py-0.5 rounded">
+                          {associatedProject?.delayMonths ? `${Math.max(1, associatedProject.delayMonths - 2)}–${associatedProject.delayMonths + 2} months` : 'On Schedule'}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="mt-3 pt-2 border-t border-slate-800 text-[11px] text-slate-400">
-                    Deadline: <strong className="text-amber-300 font-mono">{alert.actionDeadline}</strong>
+                  {/* Right Column: Factors & Actions */}
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 border-b border-slate-100 pb-2">Main Warning Factors</h4>
+                      <ul className="space-y-2 mt-3">
+                        {associatedProject?.topContributingFactors?.slice(0, 3).map((f, i) => (
+                          <li key={i} className="flex items-start gap-2 text-sm text-slate-700">
+                            <span className="text-rose-500 mt-0.5">•</span>
+                            <span>{f.factor}</span>
+                          </li>
+                        )) || (
+                          <>
+                            <li className="flex items-start gap-2 text-sm text-slate-700"><span className="text-rose-500 mt-0.5">•</span><span>Completion date approaching</span></li>
+                            <li className="flex items-start gap-2 text-sm text-slate-700"><span className="text-rose-500 mt-0.5">•</span><span>Physical progress is lower than expected</span></li>
+                            <li className="flex items-start gap-2 text-sm text-slate-700"><span className="text-rose-500 mt-0.5">•</span><span>Progress velocity has plateaued</span></li>
+                          </>
+                        )}
+                      </ul>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Recommended Action & Action Buttons */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-3 border-t border-slate-100">
-                <div className="flex items-start gap-2 text-xs text-slate-700 max-w-2xl">
-                  <Sparkles className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                  <div>
-                    <strong className="text-blue-900 font-bold">Prescriptive Protocol: </strong>
-                    <span>{alert.recommendedAction}</span>
-                  </div>
+                {/* Recommended Action */}
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-5">
+                  <h4 className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <Sparkles className="w-4 h-4" />
+                    Prescriptive Recommendation
+                  </h4>
+                  <ul className="space-y-2">
+                    {alert.recommendedAction.split('. ').filter(Boolean).map((action, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm text-slate-800 font-medium">
+                        <ArrowRight className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
+                        <span>{action.trim().endsWith('.') ? action.trim() : action.trim() + '.'}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
+                {/* Footer Actions */}
+                <div className="flex justify-end items-center gap-3 pt-2">
                   {!isAck ? (
                     <button
                       onClick={() => handleAcknowledge(alert.id)}
-                      className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold transition-all"
+                      className="px-4 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-semibold transition-all"
                     >
                       Acknowledge
                     </button>
                   ) : (
-                    <span className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-semibold flex items-center gap-1 border border-emerald-200">
-                      <CheckCheck className="w-3.5 h-3.5" />
+                    <span className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 text-sm font-semibold flex items-center gap-1 border border-emerald-200">
+                      <CheckCheck className="w-4 h-4" />
                       Acknowledged
                     </span>
                   )}
@@ -267,13 +309,14 @@ export const EarlyWarningsView: React.FC<EarlyWarningsViewProps> = ({
                   {associatedProject && (
                     <button
                       onClick={() => onSelectProject(associatedProject)}
-                      className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1"
+                      className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold transition-all shadow-md hover:shadow-lg flex items-center gap-2"
                     >
                       <span>Diagnose Project</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
+                      <ArrowRight className="w-4 h-4" />
                     </button>
                   )}
                 </div>
+
               </div>
             </div>
           );

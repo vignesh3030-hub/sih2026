@@ -3,7 +3,7 @@ import { InfrastructureProject, EarlyWarningAlert } from './types';
 import { MOCK_PROJECTS, generateEarlyWarnings } from './data/mockProjects';
 import { Header } from './components/common/Header';
 import { Sidebar } from './components/common/Sidebar';
-import { DemoFlowGuide, DemoStep, DEMO_STEPS } from './components/common/DemoFlowGuide';
+import { FloatingChatbot } from './components/common/FloatingChatbot';
 import { DashboardView } from './components/dashboard/DashboardView';
 import { ProjectsTableView } from './components/projects/ProjectsTableView';
 import { ProjectDetailModal } from './components/projects/ProjectDetailModal';
@@ -12,11 +12,22 @@ import { PredictiveAnalyticsView } from './components/predictive/PredictiveAnaly
 import { BenchmarkingView } from './components/benchmarking/BenchmarkingView';
 import { ScenarioAnalysisView } from './components/scenario/ScenarioAnalysisView';
 import { InterventionsView } from './components/interventions/InterventionsView';
+import { EscalationDriversView } from './components/drivers/EscalationDriversView';
 import { AiAssistantView } from './components/assistant/AiAssistantView';
 import { ReportsView } from './components/reports/ReportsView';
 import { SettingsView } from './components/settings/SettingsView';
+import { LoginView, UserSession } from './components/auth/LoginView';
+import { DataImportView } from './components/import/DataImportView';
+import { MilestonesView } from './components/milestones/MilestonesView';
+import { IssuesView } from './components/issues/IssuesView';
+import { DataQualityView } from './components/quality/DataQualityView';
+import { UserManagementView } from './components/users/UserManagementView';
 
 export default function App() {
+  // Authentication State
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [currentUser, setCurrentUser] = useState<UserSession | null>(null);
+
   // Application Data State
   const [projects, setProjects] = useState<InfrastructureProject[]>(MOCK_PROJECTS);
   
@@ -24,10 +35,6 @@ export default function App() {
   const [activeView, setActiveView] = useState<string>('dashboard');
   const [selectedProjectForDetail, setSelectedProjectForDetail] = useState<InfrastructureProject | null>(null);
   const [targetModuleProjectId, setTargetModuleProjectId] = useState<string>(MOCK_PROJECTS[0]?.id || '');
-
-  // SIH 2026 Interactive Demo Flow State
-  const [demoGuideOpen, setDemoGuideOpen] = useState<boolean>(true);
-  const [currentDemoStep, setCurrentDemoStep] = useState<number>(1);
 
   // Derived Alerts
   const alerts = useMemo(() => generateEarlyWarnings(projects), [projects]);
@@ -54,30 +61,18 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Handle Demo Flow Step Click
-  const handleSelectDemoStep = (step: DemoStep) => {
-    setCurrentDemoStep(step.stepNumber);
-    setActiveView(step.targetView);
-
-    if (step.targetProjectId) {
-      const proj = projects.find(p => p.id === step.targetProjectId);
-      if (proj) {
-        setTargetModuleProjectId(proj.id);
-        // If step 4 or step 6, pop open the project details / XAI modal
-        if (step.stepNumber === 4 || step.stepNumber === 6) {
-          setSelectedProjectForDetail(proj);
-        } else {
-          setSelectedProjectForDetail(null);
-        }
-      }
-    } else {
-      setSelectedProjectForDetail(null);
-    }
-  };
-
   const handleResetData = () => {
     setProjects(MOCK_PROJECTS);
   };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setCurrentUser(null);
+  };
+
+  if (!isAuthenticated || !currentUser) {
+    return <LoginView onLogin={(user) => { setCurrentUser(user); setIsAuthenticated(true); }} />;
+  }
 
   return (
     <div className="min-h-screen bg-[#f3f4f8] text-slate-900 flex flex-col font-sans antialiased selection:bg-purple-600 selection:text-white">
@@ -86,11 +81,12 @@ export default function App() {
         activeView={activeView}
         onNavigate={handleNavigate}
         onOpenSearch={() => handleNavigate('projects')}
-        onToggleDemoGuide={() => setDemoGuideOpen(prev => !prev)}
-        demoGuideOpen={demoGuideOpen}
-        demoStep={currentDemoStep}
         criticalCount={criticalCount}
         warningCount={highRiskCount}
+        currentUser={currentUser}
+        onLogout={handleLogout}
+        projects={projects}
+        onSelectProject={handleSelectProject}
       />
 
       {/* Main Layout Area */}
@@ -119,6 +115,31 @@ export default function App() {
               onSelectProject={handleSelectProject}
               onNavigate={handleNavigate}
             />
+          )}
+
+          {activeView === 'milestones' && (
+            <MilestonesView
+              projects={projects}
+              onSelectProject={handleSelectProject}
+            />
+          )}
+
+          {activeView === 'issues' && (
+            <IssuesView
+              projects={projects}
+              onSelectProject={handleSelectProject}
+            />
+          )}
+
+          {activeView === 'data-quality' && (
+            <DataQualityView
+              projects={projects}
+              onSelectProject={handleSelectProject}
+            />
+          )}
+
+          {activeView === 'users' && (
+            <UserManagementView currentUser={currentUser || undefined} />
           )}
 
           {activeView === 'early-warnings' && (
@@ -166,6 +187,14 @@ export default function App() {
             />
           )}
 
+          {activeView === 'drivers' && (
+            <EscalationDriversView
+              projects={projects}
+              onSelectProject={handleSelectProject}
+              onNavigate={handleNavigate}
+            />
+          )}
+
           {activeView === 'assistant' && (
             <AiAssistantView
               projects={projects}
@@ -185,6 +214,13 @@ export default function App() {
           {activeView === 'settings' && (
             <SettingsView onResetData={handleResetData} />
           )}
+
+          {activeView === 'data-import' && (
+            <DataImportView 
+              onImportSuccess={(newProjects) => setProjects(newProjects)} 
+              onNavigate={handleNavigate} 
+            />
+          )}
         </main>
       </div>
 
@@ -197,13 +233,8 @@ export default function App() {
         />
       )}
 
-      {/* Interactive SIH 2026 Demo Walkthrough Guide */}
-      <DemoFlowGuide
-        currentStep={currentDemoStep}
-        onSelectStep={handleSelectDemoStep}
-        isOpen={demoGuideOpen}
-        onToggle={() => setDemoGuideOpen(prev => !prev)}
-      />
+      {/* Global AI Floating Chatbot Bubble */}
+      <FloatingChatbot projects={projects} />
     </div>
   );
 }

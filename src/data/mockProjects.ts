@@ -32,9 +32,10 @@ export const MOSPI_REPORT_METRICS = {
 
 // Generate active Early Warnings based on official high-risk projects from the MoSPI report
 export function generateEarlyWarnings(projectsList: InfrastructureProject[] = mockProjects): EarlyWarningAlert[] {
-  return projectsList
-    .filter(p => p.riskLevel === 'CRITICAL' || p.riskLevel === 'HIGH' || p.delayMonths > 12)
-    .slice(0, 30)
+  const eligible = (projectsList && projectsList.length > 0) ? projectsList : mockProjects;
+  return eligible
+    .filter(p => p.riskLevel === 'CRITICAL' || p.riskLevel === 'HIGH' || p.riskLevel === 'MEDIUM' || p.delayMonths > 0 || p.costOverrunPercent > 0)
+    .slice(0, 32)
     .map((p, idx) => {
       let riskType: EarlyWarningAlert['riskType'] = 'Schedule Delay Alert';
       let reason = '';
@@ -76,7 +77,7 @@ export function generateEarlyWarnings(projectsList: InfrastructureProject[] = mo
         reason,
         evidenceMetric: metric,
         recommendedAction: action,
-        alertDate: `2026-06-30`,
+        alertDate: new Date().toISOString().split('T')[0],
         status: (idx % 3 === 0) ? 'Action Initiated' : (idx % 2 === 0) ? 'Acknowledged' : 'Active',
         actionDeadline: `2026-09-${String((idx % 20) + 10).padStart(2, '0')}`
       };
