@@ -13,6 +13,7 @@
 | :--- | :--- |
 | **Project Title** | **PAIMANA INSIGHT** (PAIMANA InfraPredict) |
 | **Lead Developer** | **Vignesh** ([vickydhanam2006@gmail.com](mailto:vickydhanam2006@gmail.com)) |
+| **Team Members** | **Tharrunika** ([Tharrunika.71382402162@sritcbe.ac.in](mailto:Tharrunika.71382402162@sritcbe.ac.in))<br/>**Sally** ([Sally.71382402124@sritcbe.ac.in](mailto:Sally.71382402124@sritcbe.ac.in))<br/>**Yuhaasri** ([yuhaasri.71382402179@sritcbe.ac.in](mailto:yuhaasri.71382402179@sritcbe.ac.in))<br/>**Vathsala** ([vathsala.71382402170@sritcbe.ac.in](mailto:vathsala.71382402170@sritcbe.ac.in))<br/>**Varshini** ([varshini.71382402168@sritcbe.ac.in](mailto:varshini.71382402168@sritcbe.ac.in)) |
 | **Target Organization** | Ministry of Statistics and Programme Implementation (MoSPI), Govt. of India |
 | **Division** | Data Informatics & Innovation Division (DIID) / Infrastructure and Project Monitoring Division (IPMD) |
 | **Problem Statement ID** | SIH 26103 — Web-Based Integrated Project-Monitoring Platform |
@@ -350,6 +351,11 @@ def predict_overrun(features: ProjectFeatures):
 Developed for **MoSPI (Ministry of Statistics and Programme Implementation)** — *Smart India Hackathon 2026*.  
 Released under the **MIT License**.
 
-- **Lead Developer**: **Vignesh**
-- **Email**: [vickydhanam2006@gmail.com](mailto:vickydhanam2006@gmail.com)
+- **Lead Developer**: **Vignesh** ([vickydhanam2006@gmail.com](mailto:vickydhanam2006@gmail.com))
+- **Team Members**:
+  - **Tharrunika**: [Tharrunika.71382402162@sritcbe.ac.in](mailto:Tharrunika.71382402162@sritcbe.ac.in)
+  - **Sally**: [Sally.71382402124@sritcbe.ac.in](mailto:Sally.71382402124@sritcbe.ac.in)
+  - **Yuhaasri**: [yuhaasri.71382402179@sritcbe.ac.in](mailto:yuhaasri.71382402179@sritcbe.ac.in)
+  - **Vathsala**: [vathsala.71382402170@sritcbe.ac.in](mailto:vathsala.71382402170@sritcbe.ac.in)
+  - **Varshini**: [varshini.71382402168@sritcbe.ac.in](mailto:varshini.71382402168@sritcbe.ac.in)
 - **Repository**: [PAIMANA INSIGHT on GitHub](https://github.com/your-org/paimana-insight)
