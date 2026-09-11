@@ -1,10 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Bot, X, Send, Sparkles, User, MessageSquare, RefreshCw } from 'lucide-react';
+import { Bot, X, Send, Sparkles, User, MessageSquare, RefreshCw, ExternalLink } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { InfrastructureProject } from '../../types';
+import { generateProjectIntelligenceResponse } from '../../utils/projectAiEngine';
 
 interface FloatingChatbotProps {
   projects: InfrastructureProject[];
+  activeProject?: InfrastructureProject | null;
 }
 
 interface ChatMessage {
@@ -13,20 +15,25 @@ interface ChatMessage {
   text: string;
   timestamp: string;
   source?: string;
+  matchedProject?: InfrastructureProject;
 }
 
-export const FloatingChatbot: React.FC<FloatingChatbotProps> = ({ projects = [] }) => {
+export const FloatingChatbot: React.FC<FloatingChatbotProps> = ({ projects = [], activeProject }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome-msg',
       sender: 'assistant',
-      text: `### Welcome to PAIMANA AI Decision Support
-I am your official infrastructure risk assistant for **MoSPI**.
+      text: `### Welcome to PAIMANA Project Intelligence Assistant
+I am your official decision-support assistant for the **Ministry of Statistics and Programme Implementation (MoSPI)**.
 
-Ask me about project delays, cost escalations, expenditure divergence, or risk scores across all monitored central sector projects!`,
+**You can ask me about any project!** Try:
+- Providing any **Project ID** or **Project Code** (e.g., \`N04000092\`, \`180100221\`, \`612786\`)
+- Asking *"Why is [Project Name] at risk?"*
+- Asking *"When did [Project Name] start?"*
+- Checking cost overruns, delay months, or statutory clearances!`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      source: 'PAIMANA Engine',
+      source: 'PAIMANA Project Intelligence Engine',
     },
   ]);
   const [inputQuery, setInputQuery] = useState('');
@@ -34,11 +41,21 @@ Ask me about project delays, cost escalations, expenditure divergence, or risk s
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const PRESET_QUERIES = [
+    'Why is Delhi-Amritsar-Katra at risk?',
+    'When did Subansiri project start?',
+    'Cost overrun of AIIMS Guwahati',
     'Which projects are at critical risk?',
-    'Show progress-expenditure divergence',
-    'Which ministry has highest delays?',
     'Top 3 cost escalation projects',
   ];
+
+  const displayPresets = activeProject
+    ? [
+        `Why is this project at risk?`,
+        `When did this project start?`,
+        `Cost & budget details`,
+        `Statutory clearances & land`,
+      ]
+    : PRESET_QUERIES;
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -66,33 +83,26 @@ Ask me about project delays, cost escalations, expenditure divergence, or risk s
     if (!customQuery) setInputQuery('');
     setIsLoading(true);
 
-    try {
-      // Safely build project summary context
-      const safeProjects = Array.isArray(projects) ? projects : [];
-      const highRiskSummary = safeProjects
-        .filter((p) => p.riskLevel === 'CRITICAL' || p.riskLevel === 'HIGH')
-        .slice(0, 5)
-        .map((p) => ({
-          code: p.projectCode || p.id,
-          name: p.name,
-          ministry: p.ministry,
-          riskScore: p.overallRiskScore || 80,
-          costOverrunPercent: p.costOverrunPercent || 0,
-          delayMonths: p.delayMonths || 0
-        }));
+    const safeProjects = Array.isArray(projects) ? projects : [];
 
+    try {
       const res = await fetch('/api/ai/assistant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt: queryToSend,
+          activeProjectId: activeProject?.id,
+          activeProject: activeProject,
           projectContext: {
-            totalProjects: safeProjects.length || 110,
-            highRiskCount: safeProjects.filter((p) => p.riskLevel === 'CRITICAL').length || 18,
-            sampleProjects: highRiskSummary,
+            totalProjects: safeProjects.length,
+            projects: safeProjects,
           },
         }),
       });
+
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
 
       const data = await res.json();
       const replyText = data.reply || data.explanation || 'Analysis completed.';
@@ -102,19 +112,24 @@ Ask me about project delays, cost escalations, expenditure divergence, or risk s
         sender: 'assistant',
         text: replyText,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        source: data.source || 'PAIMANA Statistical Engine',
+        source: data.source || 'PAIMANA Project Intelligence Engine',
+        matchedProject: data.matchedProject || (activeProject || undefined),
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
     } catch (err: any) {
-      const errorMessage: ChatMessage = {
-        id: `error-${Date.now()}`,
+      // Direct high-precision project intelligence engine fallback (100% data-backed, zero generic response)
+      const engineResult = generateProjectIntelligenceResponse(queryToSend, safeProjects, activeProject);
+
+      const assistantMessage: ChatMessage = {
+        id: `assistant-${Date.now()}`,
         sender: 'assistant',
-        text: `PAIMANA AI Assistant is ready. Analysis summary for query: "${queryToSend}" complete.\n\nKey Insights:\n- Monitored Portfolio: **110 Mega Projects**\n- Critical Risk Projects: **18**\n- Primary Bottleneck: Right-of-Way & Land Acquisition.`,
+        text: engineResult.reply,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        source: 'PAIMANA Fallback Engine'
+        source: `${engineResult.source} (Direct Client Engine)`,
+        matchedProject: engineResult.matchedProject || (activeProject || undefined),
       };
-      setMessages((prev) => [...prev, errorMessage]);
+      setMessages((prev) => [...prev, assistantMessage]);
     } finally {
       setIsLoading(false);
     }
@@ -166,9 +181,20 @@ Ask me about project delays, cost escalations, expenditure divergence, or risk s
           </button>
         </div>
 
+        {/* Active Project Banner */}
+        {activeProject && (
+          <div className="bg-purple-950 text-white px-3.5 py-2 text-xs flex items-center justify-between border-b border-purple-800 shrink-0">
+            <div className="truncate flex items-center gap-1.5 flex-1 min-w-0">
+              <span className="font-bold text-amber-300 text-[10px] uppercase tracking-wider shrink-0">Inspecting:</span>
+              <span className="truncate font-medium text-slate-100">{activeProject.name}</span>
+            </div>
+            <span className="font-mono text-[9px] px-1.5 py-0.5 bg-white/20 rounded shrink-0 ml-2 font-bold">{activeProject.projectCode}</span>
+          </div>
+        )}
+
         {/* Preset Query Chips */}
         <div className="bg-slate-100 p-2.5 border-b border-slate-200/80 flex flex-wrap gap-1.5 shrink-0">
-          {PRESET_QUERIES.map((q, idx) => (
+          {displayPresets.map((q, idx) => (
             <button
               key={idx}
               onClick={() => handleSendMessage(undefined, q)}
@@ -235,7 +261,7 @@ Ask me about project delays, cost escalations, expenditure divergence, or risk s
           <form onSubmit={(e) => handleSendMessage(e)} className="flex items-center gap-2">
             <input
               type="text"
-              placeholder="Ask about project delays, cost risk..."
+              placeholder="Enter project ID, name, or ask why at risk..."
               value={inputQuery}
               onChange={(e) => setInputQuery(e.target.value)}
               disabled={isLoading}
