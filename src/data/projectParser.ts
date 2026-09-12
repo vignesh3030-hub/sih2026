@@ -2,8 +2,8 @@ import { InfrastructureProject, Milestone, ProjectMonthlyProgress, RiskLevel, Pr
 import { RawMospiProject, RAW_MOSPI_PDF_PROJECTS } from './mospiPdfRecords';
 import extractedRecords from './extractedMospiRecords.json';
 
-const ACTIVE_RECORDS: RawMospiProject[] = extractedRecords.length > 0 
-  ? (extractedRecords as RawMospiProject[]) 
+const ACTIVE_RECORDS: RawMospiProject[] = (Array.isArray(extractedRecords) && extractedRecords.length > 0)
+  ? (extractedRecords as RawMospiProject[])
   : RAW_MOSPI_PDF_PROJECTS;
 
 function parseDateToISO(dateStr?: string, defaultYear = 2026): string {

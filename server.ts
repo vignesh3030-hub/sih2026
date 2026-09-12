@@ -5,11 +5,20 @@ import { GoogleGenAI } from '@google/genai';
 import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
 import { authRouter } from './backend/auth.ts';
+import { getAllMospiProjects } from './src/data/projectParser.ts';
+import {
+  findMatchingProjects,
+  generateProjectIntelligenceResponse,
+  buildProjectGeminiPrompt,
+} from './src/utils/projectAiEngine.ts';
 
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Initialize server-side database of MoSPI projects
+const SERVER_PROJECTS = getAllMospiProjects();
 
 const app = express();
 const PORT = 3000;
@@ -49,151 +58,66 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// 1. LLM Assistant API Endpoint
+// 1. LLM Assistant API Endpoint (Trained with Project-Specific Intelligence)
 app.post('/api/ai/assistant', async (req, res) => {
   try {
-    const { prompt, history, projectContext } = req.body;
+    const { prompt, history, projectContext, activeProjectId, activeProject: clientActiveProject } = req.body;
     const client = getGeminiClient();
 
-    const systemPrompt = `You are the PAIMANA AI Risk & Decision Assistant for the Ministry of Statistics and Programme Implementation (MoSPI) - PAIMANA Infrastructure Project Predictive Monitoring & Early Warning Platform.
+    // Use active projects from context if provided by frontend, or fallback to server database
+    const activeProjects = (projectContext && Array.isArray(projectContext.projects) && projectContext.projects.length > 0)
+      ? projectContext.projects
+      : SERVER_PROJECTS;
 
-Role and Instructions:
-1. Provide highly structured, authoritative, data-backed answers on infrastructure project monitoring, cost overruns, schedule delays, risk explainability, and prescriptive interventions.
-2. Structure your answers with clear headers. When asked to analyze a specific project, you MUST use the following exact format:
-Project [Name/Code] — Risk Analysis
-[Emoji] Overall Risk: [Score]/100 — [LEVEL]
-Risk factors:
-[Emoji] Schedule Risk: [Score]
-[Emoji] Cost Risk: [Score]
-[Emoji] Progress Risk: [Score]
-[Emoji] Expenditure-Progress Risk: [Score]
-Key observations:
-[Bullet points explaining the metrics]
-AI Recommendation:
-[Actionable recommendation]
-3. Align with the core framework: Predict → Explain → Alert → Recommend → Act.
-4. Tell the officer what is going wrong → why it is happening → how serious it is → what may happen next → what action should be considered.
-5. Use emojis correctly for risk levels: 🔴 CRITICAL (81-100), 🟠 HIGH (61-80), 🟡 MEDIUM (31-60), 🟢 LOW (0-30).
+    // Resolve active project if provided
+    const activeProject = clientActiveProject ||
+      (activeProjectId ? activeProjects.find((p: any) => p.id === activeProjectId || p.projectCode === activeProjectId) : null);
 
-Context data provided:
-${JSON.stringify(projectContext || {}, null, 2)}
-`;
+    const queryText = prompt || '';
+    const matchResult = findMatchingProjects(queryText, activeProjects, activeProject);
 
+    // If Gemini client is active (API Key provided), prompt Gemini with the exact project ground truth
     if (client) {
       try {
+        let systemPrompt = '';
+        if (matchResult.bestMatch) {
+          systemPrompt = buildProjectGeminiPrompt(matchResult.bestMatch, queryText);
+        } else {
+          systemPrompt = `You are the PAIMANA AI Risk & Decision Assistant for the Ministry of Statistics and Programme Implementation (MoSPI) - PAIMANA Infrastructure Project Predictive Monitoring & Early Warning Platform.
+Total Monitored Projects in Database: ${activeProjects.length}.
+Provide authoritative, structured, and factual answers regarding infrastructure project monitoring, cost escalations, schedule delays, and root causes.
+Do not invent fictional project metrics; be truthful and accurate.`;
+        }
+
         const response = await client.models.generateContent({
           model: 'gemini-3.7-flash',
           contents: [
-            { role: 'user', parts: [{ text: `${systemPrompt}\n\nUser Question: ${prompt}` }] }
+            { role: 'user', parts: [{ text: `${systemPrompt}\n\nUser Question: ${queryText}` }] }
           ],
         });
 
         if (response && response.text) {
           return res.json({
             reply: response.text,
-            source: 'Gemini 3.7 Flash Model',
+            matchedProject: matchResult.bestMatch,
+            source: 'Gemini 3.7 Flash Model (Grounded in MoSPI OCMS)',
+            intent: matchResult.bestMatch ? 'PROJECT_SPECIFIC' : 'GENERAL',
           });
         }
       } catch (geminiError: any) {
-        console.warn('Gemini API call failed, activating PAIMANA Statistical Engine fallback:', geminiError.message);
+        console.warn('Gemini API call failed, activating PAIMANA Project Intelligence Engine:', geminiError.message);
       }
     }
 
-    // Fallback deterministic AI logic when API key is not yet set or API fails
-      let fallbackReply = '';
-      const pLower = (prompt || '').toLowerCase();
+    // High-precision Project Intelligence Engine (runs offline or when Gemini API is unconfigured/fails)
+    const engineResult = generateProjectIntelligenceResponse(queryText, activeProjects, activeProject);
 
-      if (pLower.includes('analyze project') || pLower.includes('p123') || pLower.includes('risk of project')) {
-        fallbackReply = `Project P123 — Risk Analysis
-🔴 Overall Risk: 82/100 — CRITICAL
-
-Risk factors:
-🔴 Schedule Risk: 91
-🟠 Cost Risk: 74
-🔴 Progress Risk: 86
-🟠 Expenditure-Progress Risk: 71
-
-Key observations:
-- Physical progress is significantly below expected progress.
-- Project completion date has been revised.
-- Cost has increased from the original approval.
-- Financial expenditure is considerably higher than physical progress.
-
-AI Recommendation:
-Prioritize a project review, investigate schedule delays and contractor performance, and reassess the revised completion plan.`;
-      } else if (pLower.includes('high risk') || pLower.includes('critical')) {
-        fallbackReply = `### High-Risk Projects Executive Summary (MoSPI PAIMANA Analysis)
-
-Based on our multi-factor predictive risk model, the top critical projects requiring immediate intervention are:
-
-1. **Delhi-Amritsar-Katra Expressway (Package 4 & 5)** - *Overall Risk Score: 91/100 (Critical 🔴)*
-   - **Detected Issue**: 30-month schedule slippage with a 35.6% progress deficit against target (Actual: 52.4% vs Planned: 88.0%).
-   - **Cost Impact**: Current revised cost ₹11,920 Cr (+41.1% overrun of ₹3,470 Cr).
-   - **Root Causes**: Kathua forest ROW delay (42 km) & contractor liquidity constraints.
-   - **Recommended Action**: High-Level J&K Task Force meeting with MoEFCC and induction of secondary tunnel boring crews.
-
-2. **AIIMS Darbhanga (750 Beds & Medical College)** - *Overall Risk Score: 93/100 (Critical 🔴)*
-   - **Detected Issue**: Severe civil foundation lag (18.2% physical execution vs planned 58.0%).
-   - **Cost Overrun**: Expected ₹1,740 Cr (+37.7%).
-   - **Root Causes**: Low-lying flood embankment earthfilling delays and piling depth modifications.
-   - **Recommended Action**: Fast-track CCEA sanction for revised EFC and deploy 6 additional hydraulic piling rigs.
-
-3. **Luhri Hydroelectric Project Stage-I (210 MW)** - *Overall Risk Score: 88/100 (Critical 🔴)*
-   - **Detected Issue**: Dam abutment geotechnical shear zone and turbine generator manufacturing dispatch delays.
-   - **Recommended Action**: Inter-ministerial coordination with Heavy Industries for BHEL stator prioritization.`;
-      } else if (pLower.includes('ministry') && (pLower.includes('delay') || pLower.includes('highest'))) {
-        fallbackReply = `### Ministry-Wise Delay & Risk Ranking Analysis
-
-According to the latest PAIMANA predictive intelligence dataset:
-
-1. **Ministry of Road Transport and Highways (MoRTH)**
-   - **Average Schedule Delay**: 22.4 months
-   - **High-Risk Project Count**: 18 projects
-   - **Dominant Delay Trigger**: Right-of-Way (ROW) possession and Stage-2 Forest Diversion in hill states.
-
-2. **Ministry of Railways**
-   - **Average Schedule Delay**: 26.8 months
-   - **High-Risk Project Count**: 14 projects
-   - **Dominant Delay Trigger**: Complex geotechnical tunneling, seismic retrofitting, and land acquisition litigation.
-
-3. **Ministry of Health & Family Welfare**
-   - **Average Schedule Delay**: 21.0 months
-   - **High-Risk Project Count**: 6 projects
-   - **Dominant Delay Trigger**: Site handover readiness and specialized medical MEP procurement.
-
-**Recommendation**: Focus PMG inter-ministerial resolution specifically on MoRTH & Railway land acquisition clearances across Punjab, Bihar, and Odisha.`;
-      } else if (pLower.includes('divergence') || pLower.includes('expenditure') || pLower.includes('low physical')) {
-        fallbackReply = `### Progress-Expenditure Divergence Analysis (Capital Burn Anomaly)
-
-The following projects exhibit significant **front-loaded expenditure** with disproportionately low physical milestones:
-
-1. **Delhi-Amritsar-Katra Expressway**: Financial Progress (65.8%) vs Physical Progress (52.4%) → **13.4% Divergence**
-2. **Bundelkhand Piped Water Scheme Phase-II**: Financial Progress (75.1%) vs Physical Progress (71.8%) → **3.3% Divergence**
-3. **Eastern Grid BharatNet Phase-III**: Financial Progress (62.7%) vs Physical Progress (60.5%) → **2.2% Divergence**
-
-**Prescriptive Recommendation**: Institute third-party technical audit on contractor intermediate milestone billings. Enforce escrow-linked milestone disbursements tied strictly to verified drone/satellite GIS survey reports.`;
-      } else {
-        fallbackReply = `### PAIMANA Project Intelligence Response
-
-**Query**: "${prompt}"
-
-**Predictive Intelligence Insights**:
-- Total Active Portfolio Monitored: **110 Mega Projects** (Valued at over ₹4.2 Lakh Crore)
-- Overall Portfolio Risk Level: **18 Critical Projects 🔴**, **32 High-Risk Projects 🟠**
-- Primary Systemic Drivers:
-  1. *Right of Way & Forest Approvals*: 38% of all recorded schedule delays.
-  2. *Contractor Execution Capacity & Cashflow*: 32% of all physical progress lags.
-  3. *Raw Material Price Volatility (Steel/Bitumen/Pipes)*: 22% of budget escalations.
-
-**Prescriptive Next Steps**:
-- Navigate to **Risk Monitor** to inspect project-level S-curves.
-- Use **Scenario Analysis** to simulate the impact of contractor capacity infusion (+30%) and expedited single-window clearances.`;
-      }
-
-      return res.json({
-        reply: fallbackReply,
-        source: 'PAIMANA Statistical Decision Engine (Offline Mode)',
-      });
+    return res.json({
+      reply: engineResult.reply,
+      matchedProject: engineResult.matchedProject,
+      source: engineResult.source,
+      intent: engineResult.intent,
+    });
   } catch (error: any) {
     console.error('Error in /api/ai/assistant:', error);
     res.status(500).json({

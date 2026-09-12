@@ -234,7 +234,7 @@ export default function App() {
       )}
 
       {/* Global AI Floating Chatbot Bubble */}
-      <FloatingChatbot projects={projects} />
+      <FloatingChatbot projects={projects} activeProject={selectedProjectForDetail} />
     </div>
   );
 }

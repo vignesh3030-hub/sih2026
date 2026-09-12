@@ -14,6 +14,7 @@ import {
   HelpCircle
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import { generateProjectIntelligenceResponse } from '../../utils/projectAiEngine';
 
 interface AiAssistantViewProps {
   projects: InfrastructureProject[];
@@ -27,6 +28,7 @@ interface ChatMessage {
   text: string;
   timestamp: string;
   source?: string;
+  matchedProject?: InfrastructureProject;
 }
 
 export const AiAssistantView: React.FC<AiAssistantViewProps> = ({
@@ -42,15 +44,14 @@ export const AiAssistantView: React.FC<AiAssistantViewProps> = ({
 
 I am your official decision-support assistant for the **Ministry of Statistics and Programme Implementation (MoSPI)** infrastructure monitoring portfolio.
 
-I can help you:
-- Identify and rank high-risk infrastructure projects across all ministries
-- Uncover expenditure-vs-progress divergence anomalies
-- Explain root causes of delay (Right-of-Way, statutory clearances, contractor capacity)
-- Draft actionable inter-ministerial review briefs
-
-*Try one of the suggested prompts below or ask any specific infrastructure monitoring query!*`,
+**I am trained to answer questions about all ${projects.length} monitored projects.** You can ask me:
+- **Why a project is at risk**: e.g., *"Why is Delhi-Amritsar-Katra Expressway at risk?"*
+- **When a project started**: e.g., *"When did Subansiri project start?"*
+- **Cost & Expenditure**: e.g., *"What is the cost overrun of AIIMS Guwahati?"*
+- **Search by Project Code**: e.g., \`N04000092\`, \`180100221\`, \`612786\`, or \`N24001533\`
+- **Portfolio Analytics**: e.g., *"Which projects have highest delay in Railways?"* or *"Show divergence anomalies"*`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      source: 'PAIMANA Intelligence Engine',
+      source: 'PAIMANA Project Intelligence Engine',
     },
   ]);
 
@@ -67,11 +68,12 @@ I can help you:
   }, [messages, isLoading]);
 
   const PRESET_QUERIES = [
-    'Which projects in Ministry of Road Transport and Highways have delay risk > 80%?',
-    'Show projects where expenditure is increasing but physical progress is low (Divergence)',
     'Why is Delhi-Amritsar-Katra Expressway at critical risk?',
-    'What are the top 3 projects causing maximum cost overrun?',
-    'Give me an executive summary of high-risk projects in Railway and Energy sectors',
+    'When did Subansiri project start and what is its delay?',
+    'What is the cost overrun of AIIMS Guwahati?',
+    'Why is Mumbai Metro Line 3 delayed?',
+    'Show projects with high expenditure-progress divergence',
+    'Which Railway projects are at critical risk?',
   ];
 
   const handleSendMessage = async (queryText?: string) => {
@@ -89,38 +91,24 @@ I can help you:
     if (!queryText) setInputQuery('');
     setIsLoading(true);
 
-    try {
-      // Build relevant context from active projects dataset
-      const highRiskSummary = projects
-        .filter((p) => p.riskLevel === 'CRITICAL' || p.riskLevel === 'HIGH')
-        .slice(0, 15)
-        .map((p) => ({
-          code: p.projectCode,
-          name: p.name,
-          ministry: p.ministry,
-          sector: p.sector,
-          originalCost: p.originalCost,
-          revisedCost: p.revisedCost,
-          delayMonths: p.delayMonths,
-          physicalProgress: p.physicalProgress,
-          financialProgress: p.financialProgress,
-          riskScore: p.overallRiskScore,
-          detectedIssue: p.detectedIssue,
-          recommendedIntervention: p.recommendedIntervention,
-        }));
+    const safeProjects = Array.isArray(projects) ? projects : [];
 
+    try {
       const res = await fetch('/api/ai/assistant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt: textToSend,
           projectContext: {
-            totalProjects: projects.length,
-            highRiskCount: projects.filter((p) => p.riskLevel === 'CRITICAL').length,
-            sampleProjects: highRiskSummary,
+            totalProjects: safeProjects.length,
+            projects: safeProjects,
           },
         }),
       });
+
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
 
       const data = await res.json();
       const replyText = data.reply || data.explanation || 'Analysis completed.';
@@ -130,19 +118,24 @@ I can help you:
         sender: 'assistant',
         text: replyText,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        source: data.source || 'PAIMANA Statistical Engine',
+        source: data.source || 'PAIMANA Project Intelligence Engine',
+        matchedProject: data.matchedProject,
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
     } catch (err: any) {
-      const errorMessage: ChatMessage = {
-        id: `error-${Date.now()}`,
+      // Fallback directly to client-side deterministic project intelligence engine
+      const engineResult = generateProjectIntelligenceResponse(textToSend, safeProjects);
+
+      const assistantMessage: ChatMessage = {
+        id: `assistant-${Date.now()}`,
         sender: 'assistant',
-        text: `### PAIMANA Project Intelligence Analysis\n\n**Query**: "${textToSend}"\n\n**Analysis Summary**:\n- Total Monitored Projects: **110 Mega Infrastructure Projects**\n- Portolio Risk Level: **18 Critical (🔴)**, **32 High Risk (🟠)**\n- Primary Bottleneck: Right-of-Way Land Acquisition & Statutory Forest Approvals (38% of total schedule slippage).`,
+        text: engineResult.reply,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        source: 'PAIMANA Decision Engine (Offline Mode)'
+        source: `${engineResult.source} (Client Engine)`,
+        matchedProject: engineResult.matchedProject,
       };
-      setMessages((prev) => [...prev, errorMessage]);
+      setMessages((prev) => [...prev, assistantMessage]);
     } finally {
       setIsLoading(false);
     }
@@ -197,6 +190,25 @@ I can help you:
               className="text-xs sm:text-sm font-semibold px-4 py-2 rounded-xl bg-white hover:bg-purple-50 text-slate-800 hover:text-purple-900 border border-slate-200 shadow-2xs hover:border-purple-300 transition-all text-left disabled:opacity-50"
             >
               {q}
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5 pt-1">
+          <span className="text-[11px] font-semibold text-slate-500 mr-1">Direct Project Queries:</span>
+          {[
+            { label: 'Delhi-Amritsar-Katra (Why at risk?)', query: 'Why is Delhi-Amritsar-Katra Expressway at risk?' },
+            { label: 'Subansiri HEP (When started?)', query: 'When did Subansiri project start?' },
+            { label: 'AIIMS Guwahati (Cost Overrun)', query: 'What is the cost overrun of AIIMS Guwahati?' },
+            { label: 'Hollongi Airport (Code N04000092)', query: 'N04000092' },
+            { label: 'Bullet Train (Status)', query: 'Status of Mumbai Ahmedabad High Speed Rail Bullet Train' },
+          ].map((item, idx) => (
+            <button
+              key={idx}
+              onClick={() => handleSendMessage(item.query)}
+              disabled={isLoading}
+              className="text-xs px-2.5 py-1 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 transition-all font-medium disabled:opacity-50"
+            >
+              {item.label}
             </button>
           ))}
         </div>

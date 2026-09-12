@@ -3,88 +3,44 @@
     "id": "usr-001",
     "username": "varshini",
     "email": "varshini@paimana.gov.in",
-    "passwordHash": "$2b$10$6s7l7tOMcz4JK4Jdcvj/TekDMFrsSb5RfJTCX3zgS8k0coi788yk.",
+    "passwordHash": "$2b$10$Ghrh24Le/Sgve7Azesy0me6Swj0w/HPpaMWx5F0zyMdJWcuJkTNbG",
     "role": "ADMIN",
     "name": "Varshini",
     "department": "Data Informatics & Innovation Division (DIID)",
     "status": "Active",
-    "lastLogin": "2026-09-08T04:54:24.148Z"
+    "lastLogin": "2026-09-11T16:24:49.775Z"
   },
   {
     "id": "usr-002",
     "username": "vicky",
     "email": "vicky@paimana.gov.in",
-    "passwordHash": "$2b$10$G1M18TFMIrDn8bZM9/cxEuKeb.019KON4Eksy7rB5BPK7lQXc3TMy",
+    "passwordHash": "$2b$10$5w30nd4Bzo8BYWf7mOvATOUDu6g/fOmTIcZ1X9rkSdIMKq0kcy0tK",
     "role": "MOSPI_OFFICER",
     "name": "Vicky",
     "department": "MoSPI Project Monitoring Group (PMG)",
     "status": "Active",
-    "lastLogin": "2026-09-04T13:19:44.152Z"
+    "lastLogin": "2026-09-11T15:11:28.728Z"
   },
   {
     "id": "usr-003",
     "username": "yuhaa",
     "email": "yuhaa@paimana.gov.in",
-    "passwordHash": "$2b$10$ECG9QSCZrMnmGUN0J9IvVOAGDo.3/TPbXJy3cTiVFNLSTRz5tRMO6",
+    "passwordHash": "$2b$10$1DRBJpWmT3ZNOpzrdXf9..j1caXosG25dLomGm13FojCPVzh6ZQDe",
     "role": "PROJECT_OFFICER",
     "name": "Yuhaa",
     "department": "Field Execution & Civil Engineering",
     "status": "Active",
-    "lastLogin": "2026-09-04T06:21:26.745Z"
+    "lastLogin": "2026-09-11T15:11:28.879Z"
   },
   {
     "id": "usr-004",
     "username": "vathsala",
     "email": "vathsala@paimana.gov.in",
-    "passwordHash": "$2b$10$wYprAu94bSdJy0.xHkQhnuZail8hhinBjeogfhzoHhlaPdpWV86RC",
+    "passwordHash": "$2b$10$bXu.X8thzOWbr9/gHzW52Odf3pSXNYafuRZgOis59/gUPCDPo6kKu",
     "role": "PROJECT_OFFICER",
     "name": "Vathsala",
     "department": "Structural & Quality Control Engineering",
     "status": "Active",
-    "lastLogin": "2026-09-04T06:21:26.952Z"
-  },
-  {
-    "id": "usr-1019",
-    "name": "Vikram Sharma",
-    "username": "vikram",
-    "email": "vikram@paimana.gov.in",
-    "passwordHash": "$2b$10$H28eg3PHhMt3ZdWz7attguw88JTem7MRESQlyLtelTVYH5NQ88l/G",
-    "role": "PROJECT_OFFICER",
-    "department": "Tunneling & Underground Structures",
-    "status": "Active",
-    "lastLogin": "2026-09-04T06:25:37.609Z"
-  },
-  {
-    "id": "usr-4726",
-    "name": "sally",
-    "username": "sally",
-    "email": "sally@gov.in",
-    "passwordHash": "$2b$10$62yvFW51qo.gkLYtCa2qbuCGTgeSFP335SX5FXIovY/4yhwGlUMMu",
-    "role": "PROJECT_OFFICER",
-    "department": "Geotechnical & Infrastructure Engineering",
-    "status": "Active",
-    "lastLogin": "2026-09-04T06:39:23.721Z"
-  },
-  {
-    "id": "usr-1508",
-    "name": "tharunika",
-    "username": "tharunika",
-    "email": "tharunika@gov.in",
-    "passwordHash": "$2b$10$ZB4RHiQDEqaYiJ/TN19MWehHMu7wXeQ.vzQicH2qoX69U/sdyo6Sa",
-    "role": "PROJECT_OFFICER",
-    "department": "Geotechnical & Infrastructure Engineering",
-    "status": "Active",
-    "lastLogin": "2026-09-04T06:27:41.602Z"
-  },
-  {
-    "id": "usr-1234",
-    "name": "yathu",
-    "username": "yadhu",
-    "email": "yadhu@gov.in",
-    "passwordHash": "$2b$10$2/uQqfyno8nhAnqblCFFxuBNnigRAGF7fHJZXITAXZVXrOyNvPnpO",
-    "role": "PROJECT_OFFICER",
-    "department": "Geotechnical & Infrastructure Engineering",
-    "status": "Active",
-    "lastLogin": "2026-09-04T06:35:11.340Z"
+    "lastLogin": "2026-09-11T15:11:29.056Z"
   }
 ]
