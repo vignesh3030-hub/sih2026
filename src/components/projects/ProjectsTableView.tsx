@@ -40,9 +40,9 @@ export const ProjectsTableView: React.FC<ProjectsTableViewProps> = ({
   const [sortField, setSortField] = useState<keyof InfrastructureProject>('overallRiskScore');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
-  // Pagination State
+  // Pagination State (Default 8 per page)
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 12;
+  const [itemsPerPage, setItemsPerPage] = useState(8);
 
   // Extract unique filter dropdown values
   const ministries = useMemo(() => Array.from(new Set(projects.map(p => p.ministry))), [projects]);
@@ -562,28 +562,47 @@ export const ProjectsTableView: React.FC<ProjectsTableViewProps> = ({
         </div>
 
         {/* Pagination Footer */}
-        <div className="px-4 py-3 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
-          <div>
-            Showing <span className="font-bold text-slate-900">{((currentPage - 1) * itemsPerPage) + 1}</span> to{' '}
-            <span className="font-bold text-slate-900">{Math.min(currentPage * itemsPerPage, sortedProjects.length)}</span> of{' '}
-            <span className="font-bold text-slate-900">{sortedProjects.length}</span> projects
+        <div className="px-5 py-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-600">
+          <div className="flex items-center gap-4">
+            <div>
+              Showing <span className="font-bold text-slate-900">{sortedProjects.length > 0 ? ((currentPage - 1) * itemsPerPage) + 1 : 0}</span> to{' '}
+              <span className="font-bold text-slate-900">{Math.min(currentPage * itemsPerPage, sortedProjects.length)}</span> of{' '}
+              <span className="font-bold text-slate-900">{sortedProjects.length}</span> projects
+            </div>
+
+            <div className="flex items-center gap-1.5 border-l border-slate-300 pl-4 text-xs font-semibold text-slate-600">
+              <span>Show:</span>
+              <select
+                value={itemsPerPage}
+                onChange={(e) => {
+                  setItemsPerPage(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="py-1 px-2 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-purple-500"
+              >
+                <option value={5}>5 per page</option>
+                <option value={8}>8 per page</option>
+                <option value={10}>10 per page</option>
+                <option value={25}>25 per page</option>
+              </select>
+            </div>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             <button
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className="px-3 py-1.5 rounded-lg border border-slate-300 bg-white font-medium hover:bg-slate-100 disabled:opacity-40 disabled:pointer-events-none"
+              className="px-3.5 py-1.5 rounded-xl border border-slate-300 bg-white font-bold text-slate-700 hover:bg-purple-50 hover:border-purple-300 disabled:opacity-40 disabled:pointer-events-none transition-all cursor-pointer shadow-2xs"
             >
               Previous
             </button>
-            <div className="px-3 font-mono font-semibold">
+            <div className="px-3.5 py-1 bg-white border border-slate-200 rounded-xl font-mono font-bold text-purple-900 shadow-2xs">
               Page {currentPage} of {totalPages}
             </div>
             <button
               onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-              className="px-3 py-1.5 rounded-lg border border-slate-300 bg-white font-medium hover:bg-slate-100 disabled:opacity-40 disabled:pointer-events-none"
+              disabled={currentPage === totalPages || totalPages === 0}
+              className="px-3.5 py-1.5 rounded-xl border border-slate-300 bg-white font-bold text-slate-700 hover:bg-purple-50 hover:border-purple-300 disabled:opacity-40 disabled:pointer-events-none transition-all cursor-pointer shadow-2xs"
             >
               Next
             </button>

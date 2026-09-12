@@ -75,8 +75,8 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f3f4f8] text-slate-900 flex flex-col font-sans antialiased selection:bg-purple-600 selection:text-white">
-      {/* Sleek Top Navigation Header */}
+    <div className="h-screen w-screen bg-[#f3f4f8] text-slate-900 flex flex-col overflow-hidden font-sans antialiased selection:bg-purple-600 selection:text-white">
+      {/* Sleek Top Navigation Header - Fixed at Top */}
       <Header
         activeView={activeView}
         onNavigate={handleNavigate}
@@ -89,9 +89,9 @@ export default function App() {
         onSelectProject={handleSelectProject}
       />
 
-      {/* Main Layout Area */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Sleek Purple Sidebar Navigation */}
+      {/* Main Body Layout Area - Full height remaining */}
+      <div className="flex-1 flex overflow-hidden relative">
+        {/* Fixed Left Sidebar Navigation */}
         <Sidebar
           activeView={activeView}
           onNavigate={handleNavigate}
@@ -99,8 +99,8 @@ export default function App() {
           highRiskCount={highRiskCount}
         />
 
-        {/* Content Container - Equal side margins covering full width */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 w-full">
+        {/* Content Container - Independently Scrollable */}
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 w-full h-full">
           {activeView === 'dashboard' && (
             <DashboardView
               projects={projects}
