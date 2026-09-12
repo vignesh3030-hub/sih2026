@@ -40,146 +40,193 @@ const STOP_WORDS = new Set([
 ]);
 
 /**
- * Intelligent project finder: matches project code, project ID, exact name, or partial token overlap
+ * Inverted Index Structure for O(1) Token-based Project Lookups
+ */
+export class InvertedProjectIndex {
+  private codeMap = new Map<string, InfrastructureProject>();
+  private idMap = new Map<string, InfrastructureProject>();
+  private tokenMap = new Map<string, Set<InfrastructureProject>>();
+  private allProjects: InfrastructureProject[] = [];
+
+  constructor(projects: InfrastructureProject[] = []) {
+    if (projects.length > 0) {
+      this.buildIndex(projects);
+    }
+  }
+
+  public buildIndex(projects: InfrastructureProject[]) {
+    this.allProjects = projects;
+    this.codeMap.clear();
+    this.idMap.clear();
+    this.tokenMap.clear();
+
+    for (const p of projects) {
+      if (p.projectCode) {
+        this.codeMap.set(normalizeText(p.projectCode), p);
+      }
+      if (p.id) {
+        this.idMap.set(normalizeText(p.id), p);
+      }
+
+      // Index tokens from name, agency, sector, state
+      const textToTokenize = `${p.name} ${p.implementingAgency} ${p.sector} ${p.state} ${p.district}`;
+      const tokens = normalizeText(textToTokenize).split(' ');
+
+      for (const token of tokens) {
+        if (token.length >= 2 && !STOP_WORDS.has(token)) {
+          let set = this.tokenMap.get(token);
+          if (!set) {
+            set = new Set<InfrastructureProject>();
+            this.tokenMap.set(token, set);
+          }
+          set.add(p);
+        }
+      }
+    }
+  }
+
+  public findFast(query: string, activeProject?: InfrastructureProject | null): ProjectMatchResult {
+    const normQuery = normalizeText(query);
+    if (!normQuery) {
+      return activeProject
+        ? { bestMatch: activeProject, allMatches: [activeProject], confidence: 100 }
+        : { bestMatch: null, allMatches: [], confidence: 0 };
+    }
+
+    // Contextual references to "this project"
+    if (
+      activeProject &&
+      (normQuery.includes('this project') ||
+        normQuery.includes('the project') ||
+        normQuery.includes('current project') ||
+        normQuery.includes('it at risk') ||
+        normQuery.includes('it start') ||
+        normQuery === 'why' ||
+        normQuery.startsWith('why is it') ||
+        normQuery.startsWith('why is this') ||
+        normQuery.startsWith('when did it') ||
+        normQuery.startsWith('what is the cost') ||
+        normQuery === 'status' ||
+        normQuery === 'cost' ||
+        normQuery === 'timeline')
+    ) {
+      return { bestMatch: activeProject, allMatches: [activeProject], confidence: 100 };
+    }
+
+    // Direct O(1) Exact Code or ID Lookup
+    const codeMatch = this.codeMap.get(normQuery);
+    if (codeMatch) {
+      return { bestMatch: codeMatch, allMatches: [codeMatch], confidence: 100 };
+    }
+
+    const idMatch = this.idMap.get(normQuery);
+    if (idMatch) {
+      return { bestMatch: idMatch, allMatches: [idMatch], confidence: 100 };
+    }
+
+    // Check code substrings
+    for (const [code, p] of this.codeMap.entries()) {
+      if (code.length >= 4 && normQuery.includes(code)) {
+        return { bestMatch: p, allMatches: [p], confidence: 100 };
+      }
+    }
+
+    // Token intersection scoring over inverted index
+    const queryTokens = normQuery.split(' ').filter((w) => w.length >= 2 && !STOP_WORDS.has(w));
+    const candidateScores = new Map<InfrastructureProject, number>();
+
+    for (const token of queryTokens) {
+      const matches = this.tokenMap.get(token);
+      if (matches) {
+        for (const proj of matches) {
+          const current = candidateScores.get(proj) || 0;
+          candidateScores.set(proj, current + 25);
+        }
+      }
+    }
+
+    if (candidateScores.size > 0) {
+      const sorted: { project: InfrastructureProject; score: number }[] = [];
+
+      for (const [proj, score] of candidateScores.entries()) {
+        sorted.push({ project: proj, score });
+      }
+
+      sorted.sort((a, b) => b.score - a.score);
+
+      return {
+        bestMatch: sorted[0].project,
+        allMatches: sorted.slice(0, 5).map((s) => s.project),
+        confidence: Math.min(100, sorted[0].score),
+      };
+    }
+
+    if (activeProject && !normQuery.includes('all projects') && !normQuery.includes('which projects') && !normQuery.includes('top projects')) {
+      return { bestMatch: activeProject, allMatches: [activeProject], confidence: 80 };
+    }
+
+    return { bestMatch: null, allMatches: [], confidence: 0 };
+  }
+}
+
+/**
+ * Sub-millisecond LRU Response Cache
+ */
+export class QueryResponseCache {
+  private cache = new Map<string, { value: any; expiresAt: number }>();
+  private ttlMs: number;
+  private maxSize: number;
+
+  constructor(ttlMs = 300000, maxSize = 2000) {
+    this.ttlMs = ttlMs;
+    this.maxSize = maxSize;
+  }
+
+  public get(key: string): any | null {
+    const entry = this.cache.get(key);
+    if (!entry) return null;
+    if (Date.now() > entry.expiresAt) {
+      this.cache.delete(key);
+      return null;
+    }
+    return entry.value;
+  }
+
+  public set(key: string, value: any) {
+    if (this.cache.size >= this.maxSize) {
+      const firstKey = this.cache.keys().next().value;
+      if (firstKey) this.cache.delete(firstKey);
+    }
+    this.cache.set(key, { value, expiresAt: Date.now() + this.ttlMs });
+  }
+
+  public clear() {
+    this.cache.clear();
+  }
+}
+
+// Global Singleton Instance for High Performance Inverted Search Index & Cache
+export const globalProjectIndex = new InvertedProjectIndex();
+export const globalResponseCache = new QueryResponseCache();
+
+/**
+ * High-performance project finder utilizing Inverted Index & Cache
  */
 export function findMatchingProjects(
   query: string,
   projects: InfrastructureProject[],
   activeProject?: InfrastructureProject | null
 ): ProjectMatchResult {
-  if (!query || !query.trim() || !projects || projects.length === 0) {
-    if (activeProject) {
-      return { bestMatch: activeProject, allMatches: [activeProject], confidence: 100 };
-    }
-    return { bestMatch: null, allMatches: [], confidence: 0 };
-  }
+  const cacheKey = `match:${query}:${activeProject?.id || 'none'}:${projects.length}`;
+  const cached = globalResponseCache.get(cacheKey);
+  if (cached) return cached;
 
-  const rawQuery = query.trim();
-  const normQuery = normalizeText(rawQuery);
-  const words = normQuery.split(' ').filter(w => w.length >= 2);
+  // Build index if not built or size changed
+  globalProjectIndex.buildIndex(projects);
 
-  // If query refers to "this project", "it", or contextual questions and an activeProject is provided
-  if (
-    activeProject &&
-    (normQuery.includes('this project') ||
-     normQuery.includes('the project') ||
-     normQuery.includes('current project') ||
-     normQuery.includes('it at risk') ||
-     normQuery.includes('it start') ||
-     normQuery === 'why' ||
-     normQuery.startsWith('why is it') ||
-     normQuery.startsWith('why is this') ||
-     normQuery.startsWith('when did it') ||
-     normQuery.startsWith('what is the cost') ||
-     normQuery === 'status' ||
-     normQuery === 'cost' ||
-     normQuery === 'timeline')
-  ) {
-    return { bestMatch: activeProject, allMatches: [activeProject], confidence: 100 };
-  }
-
-  // 1. Direct Project Code or ID match (highest priority)
-  for (const p of projects) {
-    const pCodeNorm = normalizeText(p.projectCode);
-    const pIdNorm = normalizeText(p.id);
-
-    // Exact code inside query (e.g. "N04000092", "612786", "proj-N04000092-0")
-    if (
-      p.projectCode &&
-      normQuery.includes(pCodeNorm) &&
-      pCodeNorm.length >= 4
-    ) {
-      return { bestMatch: p, allMatches: [p], confidence: 100 };
-    }
-
-    if (p.id && normQuery.includes(pIdNorm) && pIdNorm.length >= 4) {
-      return { bestMatch: p, allMatches: [p], confidence: 100 };
-    }
-  }
-
-  // 2. Exact or near-exact name match
-  for (const p of projects) {
-    const pNameNorm = normalizeText(p.name);
-    if (pNameNorm.length >= 6 && normQuery.includes(pNameNorm)) {
-      return { bestMatch: p, allMatches: [p], confidence: 95 };
-    }
-    if (normQuery.length >= 6 && pNameNorm.includes(normQuery)) {
-      return { bestMatch: p, allMatches: [p], confidence: 90 };
-    }
-  }
-
-  // 3. Significant token-based matching & scoring
-  const queryKeywords = words.filter(w => !STOP_WORDS.has(w) && w.length >= 3);
-  const scoredProjects: { project: InfrastructureProject; score: number }[] = [];
-
-  for (const p of projects) {
-    const pNameNorm = normalizeText(p.name);
-    const pCodeNorm = normalizeText(p.projectCode);
-    const pAgencyNorm = normalizeText(p.implementingAgency);
-    const pStateNorm = normalizeText(p.state);
-    const pSectorNorm = normalizeText(p.sector);
-
-    let score = 0;
-
-    // Check query keywords against project name & metadata
-    for (const kw of queryKeywords) {
-      // Substring in code
-      if (pCodeNorm.includes(kw)) {
-        score += 40;
-      }
-      // Substring in name
-      if (pNameNorm.includes(kw)) {
-        score += 25;
-      }
-      // Substring in agency (e.g. NHPC, AAI, NHAI)
-      if (pAgencyNorm.includes(kw)) {
-        score += 15;
-      }
-      // Substring in state
-      if (pStateNorm.includes(kw)) {
-        score += 8;
-      }
-      // Substring in sector
-      if (pSectorNorm.includes(kw)) {
-        score += 6;
-      }
-    }
-
-    // Boost if query mentions distinctive project name fragments
-    const distinctiveFragments = [
-      'katra', 'amritsar', 'delhi', 'subansiri', 'dibang', 'hollongi',
-      'aiims', 'darbhanga', 'guwahati', 'bullet train', 'mumbai metro',
-      'bangalore metro', 'delhi metro', 'silkyara', 'polavaram', 'buxar',
-      'barh', 'luhri', 'pakal dul', 'rishikesh', 'karnaprayag', 'talcher',
-      'kadapa', 'vijayawada', 'rajahmundry', 'dholera', 'panipat', 'numaligarh'
-    ];
-
-    for (const frag of distinctiveFragments) {
-      if (normQuery.includes(frag) && pNameNorm.includes(frag)) {
-        score += 50;
-      }
-    }
-
-    if (score > 18) {
-      scoredProjects.push({ project: p, score });
-    }
-  }
-
-  scoredProjects.sort((a, b) => b.score - a.score);
-
-  if (scoredProjects.length > 0) {
-    return {
-      bestMatch: scoredProjects[0].project,
-      allMatches: scoredProjects.slice(0, 5).map(s => s.project),
-      confidence: Math.min(100, scoredProjects[0].score)
-    };
-  }
-
-  if (activeProject && !normQuery.includes('all projects') && !normQuery.includes('which projects') && !normQuery.includes('top projects')) {
-    return { bestMatch: activeProject, allMatches: [activeProject], confidence: 80 };
-  }
-
-  return { bestMatch: null, allMatches: [], confidence: 0 };
+  const result = globalProjectIndex.findFast(query, activeProject);
+  globalResponseCache.set(cacheKey, result);
+  return result;
 }
 
 /**

@@ -10,15 +10,20 @@ import {
   findMatchingProjects,
   generateProjectIntelligenceResponse,
   buildProjectGeminiPrompt,
+  globalProjectIndex,
+  globalResponseCache,
 } from './src/utils/projectAiEngine.ts';
+import { globalWorkerPool } from './src/utils/projectWorkerPool.ts';
 
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Initialize server-side database of MoSPI projects
+// Initialize server-side database of MoSPI projects & warm up Inverted Search Index
 const SERVER_PROJECTS = getAllMospiProjects();
+globalProjectIndex.buildIndex(SERVER_PROJECTS);
+console.log(`🚀 Inverted Search Index pre-built for ${SERVER_PROJECTS.length} MoSPI infrastructure projects.`);
 
 const app = express();
 const PORT = 3000;
@@ -55,6 +60,17 @@ app.get('/api/health', (req, res) => {
     system: 'PAIMANA InfraPredict Decision Support Engine',
     timestamp: new Date().toISOString(),
     geminiEnabled: !!process.env.GEMINI_API_KEY,
+    totalProjectsIndexed: SERVER_PROJECTS.length,
+  });
+});
+
+// Performance & Concurrency Metrics Endpoint
+app.get('/api/performance/stats', (req, res) => {
+  res.json({
+    system: 'PAIMANA High-Performance Async Architecture',
+    workerPool: globalWorkerPool.getQueueMetrics(),
+    indexedProjectsCount: SERVER_PROJECTS.length,
+    timestamp: new Date().toISOString(),
   });
 });
 
@@ -62,62 +78,68 @@ app.get('/api/health', (req, res) => {
 app.post('/api/ai/assistant', async (req, res) => {
   try {
     const { prompt, history, projectContext, activeProjectId, activeProject: clientActiveProject } = req.body;
-    const client = getGeminiClient();
+    
+    // Offload CPU-bound token matching and response generation to non-blocking worker pool
+    const result = await globalWorkerPool.enqueue(async () => {
+      const client = getGeminiClient();
 
-    // Use active projects from context if provided by frontend, or fallback to server database
-    const activeProjects = (projectContext && Array.isArray(projectContext.projects) && projectContext.projects.length > 0)
-      ? projectContext.projects
-      : SERVER_PROJECTS;
+      // Use active projects from context if provided by frontend, or fallback to server database
+      const activeProjects = (projectContext && Array.isArray(projectContext.projects) && projectContext.projects.length > 0)
+        ? projectContext.projects
+        : SERVER_PROJECTS;
 
-    // Resolve active project if provided
-    const activeProject = clientActiveProject ||
-      (activeProjectId ? activeProjects.find((p: any) => p.id === activeProjectId || p.projectCode === activeProjectId) : null);
+      // Resolve active project if provided
+      const activeProject = clientActiveProject ||
+        (activeProjectId ? activeProjects.find((p: any) => p.id === activeProjectId || p.projectCode === activeProjectId) : null);
 
-    const queryText = prompt || '';
-    const matchResult = findMatchingProjects(queryText, activeProjects, activeProject);
+      const queryText = prompt || '';
+      const matchResult = findMatchingProjects(queryText, activeProjects, activeProject);
 
-    // If Gemini client is active (API Key provided), prompt Gemini with the exact project ground truth
-    if (client) {
-      try {
-        let systemPrompt = '';
-        if (matchResult.bestMatch) {
-          systemPrompt = buildProjectGeminiPrompt(matchResult.bestMatch, queryText);
-        } else {
-          systemPrompt = `You are the PAIMANA AI Risk & Decision Assistant for the Ministry of Statistics and Programme Implementation (MoSPI) - PAIMANA Infrastructure Project Predictive Monitoring & Early Warning Platform.
+      // If Gemini client is active (API Key provided), prompt Gemini with the exact project ground truth
+      if (client) {
+        try {
+          let systemPrompt = '';
+          if (matchResult.bestMatch) {
+            systemPrompt = buildProjectGeminiPrompt(matchResult.bestMatch, queryText);
+          } else {
+            systemPrompt = `You are the PAIMANA AI Risk & Decision Assistant for the Ministry of Statistics and Programme Implementation (MoSPI) - PAIMANA Infrastructure Project Predictive Monitoring & Early Warning Platform.
 Total Monitored Projects in Database: ${activeProjects.length}.
 Provide authoritative, structured, and factual answers regarding infrastructure project monitoring, cost escalations, schedule delays, and root causes.
 Do not invent fictional project metrics; be truthful and accurate.`;
-        }
+          }
 
-        const response = await client.models.generateContent({
-          model: 'gemini-3.7-flash',
-          contents: [
-            { role: 'user', parts: [{ text: `${systemPrompt}\n\nUser Question: ${queryText}` }] }
-          ],
-        });
-
-        if (response && response.text) {
-          return res.json({
-            reply: response.text,
-            matchedProject: matchResult.bestMatch,
-            source: 'Gemini 3.7 Flash Model (Grounded in MoSPI OCMS)',
-            intent: matchResult.bestMatch ? 'PROJECT_SPECIFIC' : 'GENERAL',
+          const response = await client.models.generateContent({
+            model: 'gemini-3.7-flash',
+            contents: [
+              { role: 'user', parts: [{ text: `${systemPrompt}\n\nUser Question: ${queryText}` }] }
+            ],
           });
+
+          if (response && response.text) {
+            return {
+              reply: response.text,
+              matchedProject: matchResult.bestMatch,
+              source: 'Gemini 3.7 Flash Model (Grounded in MoSPI OCMS)',
+              intent: matchResult.bestMatch ? 'PROJECT_SPECIFIC' : 'GENERAL',
+            };
+          }
+        } catch (geminiError: any) {
+          console.warn('Gemini API call failed, activating PAIMANA Project Intelligence Engine:', geminiError.message);
         }
-      } catch (geminiError: any) {
-        console.warn('Gemini API call failed, activating PAIMANA Project Intelligence Engine:', geminiError.message);
       }
-    }
 
-    // High-precision Project Intelligence Engine (runs offline or when Gemini API is unconfigured/fails)
-    const engineResult = generateProjectIntelligenceResponse(queryText, activeProjects, activeProject);
+      // High-precision Project Intelligence Engine (runs offline or when Gemini API is unconfigured/fails)
+      const engineResult = generateProjectIntelligenceResponse(queryText, activeProjects, activeProject);
 
-    return res.json({
-      reply: engineResult.reply,
-      matchedProject: engineResult.matchedProject,
-      source: engineResult.source,
-      intent: engineResult.intent,
+      return {
+        reply: engineResult.reply,
+        matchedProject: engineResult.matchedProject,
+        source: engineResult.source,
+        intent: engineResult.intent,
+      };
     });
+
+    return res.json(result);
   } catch (error: any) {
     console.error('Error in /api/ai/assistant:', error);
     res.status(500).json({
