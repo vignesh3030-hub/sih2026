@@ -23,7 +23,10 @@ import {
   FileBarChart,
   Activity,
   BookOpen,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Pin,
+  Lock,
+  Unlock
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -39,7 +42,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
   criticalCount,
   highRiskCount,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
+  // Always default to locked = true in all views and sessions
+  const [isLocked, setIsLocked] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('paimana_sidebar_locked');
+      return saved !== null ? saved === 'true' : true;
+    }
+    return true;
+  });
+
+  const [isExpanded, setIsExpanded] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const savedLocked = localStorage.getItem('paimana_sidebar_locked');
+      if (savedLocked === 'true' || savedLocked === null) return true;
+      const savedExpanded = localStorage.getItem('paimana_sidebar_expanded');
+      return savedExpanded !== null ? savedExpanded === 'true' : true;
+    }
+    return true;
+  });
+
+  const toggleLock = (locked: boolean) => {
+    setIsLocked(locked);
+    localStorage.setItem('paimana_sidebar_locked', String(locked));
+    if (locked) {
+      setIsExpanded(true);
+      localStorage.setItem('paimana_sidebar_expanded', 'true');
+    }
+  };
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: BarChart2, badge: null },
@@ -63,20 +92,76 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <aside
+      onMouseEnter={() => {
+        if (!isLocked) setIsExpanded(true);
+      }}
+      onMouseLeave={() => {
+        if (!isLocked) setIsExpanded(false);
+      }}
       className={`transition-all duration-300 ease-in-out bg-[#3e104f] text-white flex flex-col shrink-0 z-20 min-h-[calc(100vh-65px)] ${
-        isExpanded ? 'w-60' : 'w-18'
+        isExpanded ? 'w-64' : 'w-18'
       }`}
       style={{ backgroundColor: '#451254' }}
     >
-      {/* Top Toggle Button */}
+      {/* Top Toggle & Lock Button Header */}
       <div className="p-3.5 flex items-center justify-between border-b border-purple-900/40">
-        <button
-          onClick={() => setIsExpanded(prev => !prev)}
-          className="w-10 h-10 rounded-xl hover:bg-white/10 flex items-center justify-center text-purple-200 hover:text-white transition-all mx-auto focus:outline-hidden"
-          title={isExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
-        >
-          <Menu className="w-5 h-5" />
-        </button>
+        {isExpanded ? (
+          <div className="flex items-center justify-between w-full px-1">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-amber-400/20 text-amber-400 flex items-center justify-center font-bold text-xs">
+                <Zap className="w-4 h-4" />
+              </div>
+              <span className="font-bold text-xs text-white tracking-wide uppercase">Navigation</span>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => {
+                  toggleLock(!isLocked);
+                }}
+                className={`px-2 py-1 rounded-lg transition-all text-xs flex items-center gap-1.5 ${
+                  isLocked 
+                    ? 'bg-amber-400/20 text-amber-300 border border-amber-400/40 font-bold' 
+                    : 'text-purple-300 hover:bg-white/10 hover:text-white'
+                }`}
+                title={isLocked ? 'Sidebar is locked expanded in all views. Click to unlock.' : 'Lock sidebar expanded'}
+              >
+                <Pin className={`w-3.5 h-3.5 transition-transform ${isLocked ? 'rotate-45 text-amber-400 fill-amber-400' : ''}`} />
+                <span className="text-[10px] font-bold">{isLocked ? 'Locked' : 'Lock'}</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  if (isLocked) {
+                    toggleLock(false);
+                    setIsExpanded(false);
+                    localStorage.setItem('paimana_sidebar_expanded', 'false');
+                  } else {
+                    const nextExpanded = !isExpanded;
+                    setIsExpanded(nextExpanded);
+                    localStorage.setItem('paimana_sidebar_expanded', String(nextExpanded));
+                  }
+                }}
+                className="p-1.5 rounded-lg text-purple-300 hover:bg-white/10 hover:text-white transition-all"
+                title={isExpanded ? "Collapse sidebar" : "Expand sidebar"}
+              >
+                <Menu className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-2 w-full">
+            <button
+              onClick={() => {
+                toggleLock(true);
+              }}
+              className="w-10 h-10 rounded-xl bg-purple-900/40 hover:bg-white/10 flex items-center justify-center text-purple-200 hover:text-white transition-all focus:outline-hidden"
+              title="Lock Sidebar Expanded in All Views"
+            >
+              <Pin className="w-4 h-4 text-amber-400 fill-amber-400 rotate-45" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Nav Icons List */}

@@ -40,11 +40,38 @@ export const Header: React.FC<HeaderProps> = ({
   projects = [],
   onSelectProject
 }) => {
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('paimana_theme') === 'dark' || document.documentElement.classList.contains('dark');
+    }
+    return false;
+  });
   const [showNotifications, setShowNotifications] = useState(false);
   const [localSearchQuery, setLocalSearchQuery] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
+
+  const toggleDarkMode = (enableDark: boolean) => {
+    setIsDarkMode(enableDark);
+    if (enableDark) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('paimana_theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('paimana_theme', 'light');
+    }
+  };
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('paimana_theme');
+    if (savedTheme === 'dark') {
+      setIsDarkMode(true);
+      document.documentElement.classList.add('dark');
+    } else if (savedTheme === 'light') {
+      setIsDarkMode(false);
+      document.documentElement.classList.remove('dark');
+    }
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -157,7 +184,7 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Theme Switcher Pill matching screenshot */}
           <div className="flex items-center bg-slate-100 border border-slate-200 p-0.5 rounded-full">
             <button
-              onClick={() => setIsDarkMode(false)}
+              onClick={() => toggleDarkMode(false)}
               className={`p-1.5 rounded-full transition-all ${
                 !isDarkMode ? 'bg-white text-slate-800 shadow-2xs' : 'text-slate-400 hover:text-slate-600'
               }`}
@@ -166,7 +193,7 @@ export const Header: React.FC<HeaderProps> = ({
               <Sun className="w-3.5 h-3.5" />
             </button>
             <button
-              onClick={() => setIsDarkMode(true)}
+              onClick={() => toggleDarkMode(true)}
               className={`p-1.5 rounded-full transition-all ${
                 isDarkMode ? 'bg-[#451254] text-white shadow-2xs' : 'text-slate-400 hover:text-slate-600'
               }`}
